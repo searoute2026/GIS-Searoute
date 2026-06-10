@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>GIS RAG - Kedalaman Laut Bebas Titik | Blue Current</title>
+    <title>GIS RAG - Pulau & Zona Kedalaman Laut | Blue Current</title>
     <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -154,7 +155,7 @@
     <div id="map"></div>
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header" id="sidebarHeader">
-            <h3><i class="fas fa-map-marked-alt"></i> GIS RAG · Pulau & Zona Kedalaman (Bebas Titik)</h3>
+            <h3><i class="fas fa-map-marked-alt"></i> GIS RAG · Pulau & Zona Kedalaman</h3>
             <span class="toggle-icon"><i class="fas fa-chevron-down"></i></span>
         </div>
         <div class="sidebar-content">
@@ -184,8 +185,8 @@
                     <option value="#3b82f6">🔵 Biru</option><option value="#FF6B6B">🔴 Merah</option><option value="#10b981">💚 Hijau</option>
                 </select>
                 <div id="currentPointsPanel" style="display:none; background:#f0f9ff; padding:16px; border-radius:28px;">
-                    <strong><i class="fas fa-map-pin"></i> Titik (SEMUA AKAN TERSIMPAN):</strong>
-                    <div id="currentPointsList" style="margin-top:12px; max-height:150px; overflow-y:auto;"></div>
+                    <strong><i class="fas fa-map-pin"></i> Titik:</strong>
+                    <div id="currentPointsList" style="margin-top:12px;"></div>
                     <button id="clearCurrentPointsBtn" class="btn-warning" style="width:100%; margin-top:12px;">Hapus Semua Titik</button>
                 </div>
             </div>
@@ -199,20 +200,20 @@
                 <div class="label-input"><input type="text" id="searchIsland" placeholder="Cari pulau"><button id="searchIslandBtn" class="btn-primary"><i class="fas fa-search"></i></button></div>
             </div>
             
-            <!-- TAB ZONA KEDALAMAN (GARIS / POLYLINE BEBAS TITIK) -->
+            <!-- TAB ZONA KEDALAMAN (Garis / Area) -->
             <div class="tab-pane" id="tab-depth">
                 <div class="action-buttons">
-                    <button id="startDepthZoneBtn" class="btn-depth"><i class="fas fa-draw-polygon"></i> Buat Jalur Kedalaman (Polyline)</button>
-                    <button id="clearDepthZonesBtn" class="btn-danger"><i class="fas fa-trash-alt"></i> Hapus Semua Jalur</button>
+                    <button id="startDepthZoneBtn" class="btn-depth"><i class="fas fa-draw-polygon"></i> Buat Zona Kedalaman</button>
+                    <button id="clearDepthZonesBtn" class="btn-danger"><i class="fas fa-trash-alt"></i> Hapus Semua Zona</button>
                 </div>
                 <div class="label-input">
-                    <input type="text" id="depthZoneName" placeholder="Nama jalur kedalaman (contoh: Palung Sunda)">
+                    <input type="text" id="depthZoneName" placeholder="Nama zona (contoh: Palung Sunda)">
                     <input type="number" id="depthZoneValue" placeholder="Kedalaman (meter)" value="500" step="50">
                 </div>
                 <div style="font-size:12px; background:#eef2fa; padding:12px; border-radius:28px; margin-bottom:16px;">
-                    <i class="fas fa-info-circle"></i> <strong>BEBAS TITIK!</strong> Klik "Buat Jalur Kedalaman", lalu klik di peta sebanyak mungkin titik. Setelah selesai, klik tombol "Selesai Jalur". SEMUA titik koordinat akan tersimpan lengkap.
+                    <i class="fas fa-info-circle"></i> Klik "Buat Zona Kedalaman", gambarkan area/polygon di peta, lalu klik Selesai. Masukkan Nama & Kedalaman 1 kali.
                 </div>
-                <div style="font-weight:600; margin-bottom:8px;"><i class="fas fa-water"></i> Daftar Jalur Kedalaman (Polyline):</div>
+                <div style="font-weight:600; margin-bottom:8px;"><i class="fas fa-water"></i> Daftar Zona Kedalaman:</div>
                 <div class="depthzone-list" id="depthZoneList"></div>
             </div>
             
@@ -230,7 +231,7 @@
             </div>
         </div>
     </div>
-    <div class="info-panel" id="infoPanel"><i class="fas fa-info-circle"></i> ✅ Zona Kedalaman sekarang menyimpan SEMUA titik polyline. Gambar jalur dengan klik titik sebanyak yang kamu mau!</div>
+    <div class="info-panel" id="infoPanel"><i class="fas fa-info-circle"></i> 📌 Untuk KEDALAMAN: Klik tab Kedalaman > "Buat Zona Kedalaman", gambar area (polygon) bebas, lalu isi nama & kedalaman.</div>
     <div class="mouse-coords" id="mouseCoords"><i class="fas fa-mouse-pointer"></i> --, --</div>
 
     <script>
@@ -241,7 +242,7 @@
         // Struktur Data
         let appData = {
             islands: [],     // { name, polygon: [[lat,lng],...] }
-            depthZones: []   // { name, depth, polyline: [[lat,lng],...] } -> polyline, bukan polygon!
+            depthZones: []   // { name, depth, polygon: [[lat,lng],...] } 
         };
         
         // Variabel global untuk drawing (untuk pulau dan zona kedalaman)
@@ -289,7 +290,7 @@
         const depthZoneName = document.getElementById('depthZoneName');
         const depthZoneValue = document.getElementById('depthZoneValue');
         
-        // Helper: kurva Bezier (3/4 titik) - untuk visualisasi, tapi titik asli tetap disimpan semua
+        // Helper: kurva Bezier (3/4 titik)
         function getBezierPoints(points, t) {
             if(points.length===3) { const [p0,p1,p2]=points; return [(1-t)**2*p0[0]+2*(1-t)*t*p1[0]+t**2*p2[0], (1-t)**2*p0[1]+2*(1-t)*t*p1[1]+t**2*p2[1]]; }
             else if(points.length===4) { const [p0,p1,p2,p3]=points; return [(1-t)**3*p0[0]+3*(1-t)**2*t*p1[0]+3*(1-t)*t**2*p2[0]+t**3*p3[0], (1-t)**3*p0[1]+3*(1-t)**2*t*p1[1]+3*(1-t)*t**2*p2[1]+t**3*p3[1]]; }
@@ -303,22 +304,15 @@
             }
             return points;
         }
-        
-        // Untuk pulau tetap POLYGON, untuk zona kedalaman jadi POLYLINE
         function createPolygonFromPoints(points, color, opacity=0.5) {
             if(points.length < 3) return null;
             const latlngs = points.map(p=>[p.lat, p.lng]);
             return L.polygon(latlngs, { color, weight: 2.5, fillColor: color, fillOpacity: opacity });
         }
-        
-        function createPolylineFromPoints(points, color, weight=3) {
+        function createPolylineFromPoints(points, color) {
             if(points.length < 2) return null;
-            let latlngs = points.map(p=>[p.lat, p.lng]);
-            if(currentDrawMode === 'curve' && (points.length === 3 || points.length === 4)) {
-                const curved = generateCurvePoints(points);
-                latlngs = curved;
-            }
-            return L.polyline(latlngs, { color, weight: weight, opacity: 0.9 });
+            if(currentDrawMode === 'curve') return L.polyline(generateCurvePoints(points), { color, weight: 3 });
+            else return L.polyline(points.map(p=>[p.lat,p.lng]), { color, weight: 3 });
         }
         
         // Render semua data
@@ -337,19 +331,10 @@
             });
             
             appData.depthZones.forEach(zone => {
-                if(zone.polyline && zone.polyline.length >= 2) {
-                    // Untuk menampilkan polyline kedalaman, kita bisa gunakan warna hijau kebiruan
-                    const line = L.polyline(zone.polyline, { color: '#1e6f5c', weight: 4, opacity: 0.8 });
-                    line.addTo(map).bindPopup(`<b>🌊 ${zone.name}</b><br>Kedalaman: ${zone.depth} meter<br>Jumlah titik: ${zone.polyline.length} (SEMUA TERSIMPAN!)`);
-                    depthZoneLayers.push(line);
-                    
-                    // Tambahkan marker di setiap titik polyline untuk menunjukkan bahwa semua titik tersimpan
-                    zone.polyline.forEach((coord, idx) => {
-                        const marker = L.circleMarker([coord[0], coord[1]], { radius: 3, color: '#f59e0b', fillColor: '#f59e0b', fillOpacity: 0.8 });
-                        marker.bindTooltip(`${zone.name} - titik ${idx+1} (${zone.depth}m)`);
-                        marker.addTo(map);
-                        depthZoneLayers.push(marker);
-                    });
+                if(zone.polygon && zone.polygon.length >= 3) {
+                    const poly = L.polygon(zone.polygon, { color: '#1e6f5c', weight: 2.5, fillColor: '#28967e', fillOpacity: 0.45 });
+                    poly.addTo(map).bindPopup(`<b>🌊 ${zone.name}</b><br>Kedalaman: ${zone.depth} meter<br>Zona batimetri`);
+                    depthZoneLayers.push(poly);
                 }
             });
             updateIslandListUI();
@@ -369,15 +354,15 @@
         window.deleteIsland=(idx)=>{ appData.islands.splice(idx,1); renderAll(); infoPanel.innerHTML='Pulau dihapus'; };
         
         function updateDepthZoneListUI() {
-            if(!appData.depthZones.length){ depthZoneList.innerHTML='<div style="padding:20px;text-align:center;">🌊 Belum ada jalur kedalaman. Buat menggunakan tombol diatas (semua titik tersimpan bebas).</div>'; return; }
+            if(!appData.depthZones.length){ depthZoneList.innerHTML='<div style="padding:20px;text-align:center;">🌊 Belum ada zona kedalaman. Buat menggunakan tombol diatas.</div>'; return; }
             let html='';
             appData.depthZones.forEach((zone,idx)=>{
-                html+=`<div class="depthzone-item" onclick="window.focusDepthZone(${idx})"><div class="item-name"><span><i class="fas fa-water"></i> ${zone.name}</span><button onclick="event.stopPropagation(); window.deleteDepthZone(${idx})" style="background:#dc2626; border:none; border-radius:40px; padding:4px 12px; color:white;">Hapus</button></div><div class="item-detail">📏 ${zone.depth} m | ${zone.polyline.length} titik (semua tersimpan!)</div></div>`;
+                html+=`<div class="depthzone-item" onclick="window.focusDepthZone(${idx})"><div class="item-name"><span><i class="fas fa-water"></i> ${zone.name}</span><button onclick="event.stopPropagation(); window.deleteDepthZone(${idx})" style="background:#dc2626; border:none; border-radius:40px; padding:4px 12px; color:white;">Hapus</button></div><div class="item-detail">📏 ${zone.depth} m | ${zone.polygon.length} titik</div></div>`;
             });
             depthZoneList.innerHTML=html;
         }
-        window.focusDepthZone=(idx)=>{ const z=appData.depthZones[idx]; if(z?.polyline?.length){ const c=z.polyline.reduce((a,b)=>[a[0]+b[0],a[1]+b[1]],[0,0]); c[0]/=z.polyline.length; c[1]/=z.polyline.length; map.setView([c[0],c[1]],8); infoPanel.innerHTML=`🌊 Fokus zona: ${z.name} (${z.depth}m) - ${z.polyline.length} titik`; } };
-        window.deleteDepthZone=(idx)=>{ appData.depthZones.splice(idx,1); renderAll(); infoPanel.innerHTML='Jalur kedalaman dihapus'; };
+        window.focusDepthZone=(idx)=>{ const z=appData.depthZones[idx]; if(z?.polygon?.length){ const c=z.polygon.reduce((a,b)=>[a[0]+b[0],a[1]+b[1]],[0,0]); c[0]/=z.polygon.length; c[1]/=z.polygon.length; map.setView([c[0],c[1]],8); infoPanel.innerHTML=`🌊 Fokus zona: ${z.name} (${z.depth}m)`; } };
+        window.deleteDepthZone=(idx)=>{ appData.depthZones.splice(idx,1); renderAll(); infoPanel.innerHTML='Zona kedalaman dihapus'; };
         
         function updateJsonEditorUI(){ jsonEditor.value=JSON.stringify({ islands: appData.islands, depthZones: appData.depthZones }, null, 2); }
         
@@ -418,24 +403,19 @@
         function updatePreviewDrawing() {
             if(currentPreviewLine) map.removeLayer(currentPreviewLine);
             if(currentDrawingPoints.length >= 2) {
-                const preview = createPolylineFromPoints(currentDrawingPoints, '#aaaaee', 2);
+                const preview = createPolylineFromPoints(currentDrawingPoints, '#aaaaee');
                 if(preview) { preview.addTo(map); currentPreviewLine = preview; preview.setStyle({ opacity: 0.7, weight: 3 }); }
             }
         }
         
         function updatePointsUI() {
             if(!currentDrawingPoints.length) { currentPointsList.innerHTML = '<span>Tidak ada titik</span>'; return; }
-            currentPointsList.innerHTML = currentDrawingPoints.map((p,i)=>`<div class="point-chip">${i+1}. ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>`).join('');
+            currentPointsList.innerHTML = currentDrawingPoints.map((p,i)=>`<div class="point-chip">${i+1}. ${p.lat.toFixed(3)}, ${p.lng.toFixed(3)}</div>`).join('');
         }
         
         function finishDrawingAndExecute() {
-            // Untuk depthZone (polyline) minimal 2 titik, untuk pulau (polygon) minimal 3
-            if(drawingType === 'Zona Kedalaman' && currentDrawingPoints.length < 2) {
-                alert('Minimal 2 titik untuk membuat jalur kedalaman (polyline)');
-                return;
-            }
-            if(drawingType === 'Pulau' && currentDrawingPoints.length < 3) {
-                alert('Minimal 3 titik untuk membentuk area pulau (polygon)');
+            if(currentDrawingPoints.length < 3) {
+                alert('Minimal 3 titik untuk membentuk area (polygon)');
                 return;
             }
             if(activeDrawingCallback) {
@@ -451,12 +431,12 @@
             activeDrawingCallback = callback;
             drawingType = typeLabel;
             map.on('click', handleDrawingClick);
-            drawBtn.innerHTML = '<i class="fas fa-check-circle"></i> Selesai Jalur';
+            drawBtn.innerHTML = '<i class="fas fa-check-circle"></i> Selesai Gambar';
             drawBtn.className = 'btn-success';
             undoPointBtn.style.display = 'flex';
             currentPointsPanel.style.display = 'block';
             updatePointsUI();
-            infoPanel.innerHTML = `✏️ Mode gambar AKTIF: buat ${typeLabel}. Klik titik sebanyak apapun di peta, lalu klik Selesai. SEMUA titik akan tersimpan.`;
+            infoPanel.innerHTML = `✏️ Mode gambar AKTIF: buat area untuk ${typeLabel}. Klik titik, lalu klik Selesai.`;
         }
         
         function undoLastPoint() {
@@ -465,7 +445,7 @@
         
         function clearAllTemp() { resetDrawing(); infoPanel.innerHTML='Drawing dibatalkan'; }
         
-        // Fungsi untuk menyimpan sebagai PULAU (POLYGON)
+        // Fungsi untuk menyimpan sebagai PULAU
         function saveAsIsland(points) {
             const name = document.getElementById('newIslandName').value.trim();
             if(!name) { alert('Masukkan nama pulau!'); return; }
@@ -473,24 +453,24 @@
             appData.islands.push({ name, polygon });
             renderAll();
             document.getElementById('newIslandName').value = '';
-            infoPanel.innerHTML = `🏝️ Pulau "${name}" berhasil ditambahkan dengan ${polygon.length} titik!`;
+            infoPanel.innerHTML = `🏝️ Pulau "${name}" berhasil ditambahkan (${polygon.length} titik)`;
         }
         
-        // Fungsi untuk menyimpan sebagai ZONA KEDALAMAN (POLYLINE BEBAS TITIK)
+        // Fungsi untuk menyimpan sebagai ZONA KEDALAMAN (nama + kedalaman sekali)
         function saveAsDepthZone(points) {
             let zoneName = depthZoneName.value.trim();
             if(!zoneName) zoneName = `Zona Kedalaman ${appData.depthZones.length+1}`;
             let depthVal = parseFloat(depthZoneValue.value);
             if(isNaN(depthVal)) depthVal = 500;
-            const polyline = points.map(p=>[p.lat, p.lng]);
-            appData.depthZones.push({ name: zoneName, depth: depthVal, polyline });
+            const polygon = points.map(p=>[p.lat, p.lng]);
+            appData.depthZones.push({ name: zoneName, depth: depthVal, polygon });
             renderAll();
             depthZoneName.value = '';
             depthZoneValue.value = '500';
-            infoPanel.innerHTML = `🌊 Jalur kedalaman "${zoneName}" (${depthVal} m) tersimpan dengan ${polyline.length} titik koordinat LENGKAP!`;
+            infoPanel.innerHTML = `🌊 Zona kedalaman "${zoneName}" (${depthVal} m) tersimpan dengan ${polygon.length} titik area.`;
         }
         
-        // Event untuk mulai membuat zona kedalaman (POLYLINE)
+        // Event untuk mulai membuat zona kedalaman
         function startDepthCreation() {
             startDrawing(saveAsDepthZone, 'Zona Kedalaman');
         }
@@ -510,7 +490,7 @@
             }
         }
         
-        // RAG Search
+        // RAG Search (mencari pulau dan zona kedalaman)
         function ragSearch(query) {
             const q = query.toLowerCase();
             if(!q) return '🔍 Masukkan kata kunci.';
@@ -518,22 +498,22 @@
             const islandMatches = appData.islands.filter(i=>i.name.toLowerCase().includes(q));
             const depthMatches = appData.depthZones.filter(z=>z.name.toLowerCase().includes(q) || z.depth.toString().includes(q));
             if(islandMatches.length) result += `<strong>🏝️ Pulau:</strong><br>` + islandMatches.map(i=>`- ${i.name} (${i.polygon.length} titik)`).join('<br>') + '<br>';
-            if(depthMatches.length) result += `<strong>🌊 Jalur Kedalaman (Polyline):</strong><br>` + depthMatches.map(z=>`- ${z.name} : ${z.depth} meter, ${z.polyline.length} titik koordinat lengkap`).join('<br>');
+            if(depthMatches.length) result += `<strong>🌊 Zona Kedalaman:</strong><br>` + depthMatches.map(z=>`- ${z.name} : ${z.depth} meter (luas area)`).join('<br>');
             if(!result) return `❌ Tidak ditemukan: "${query}"`;
             return result;
         }
         
         // JSON
-        function applyJson() { try{ const d=JSON.parse(jsonEditor.value); if(d.islands!==undefined && d.depthZones!==undefined){ appData.islands=d.islands; appData.depthZones=d.depthZones; renderAll(); infoPanel.innerHTML='JSON dimuat. SEMUA titik kedalaman tersimpan.'; } else throw new Error(); } catch(e){ alert('Format harus { islands, depthZones }'); } }
+        function applyJson() { try{ const d=JSON.parse(jsonEditor.value); if(d.islands!==undefined && d.depthZones!==undefined){ appData.islands=d.islands; appData.depthZones=d.depthZones; renderAll(); infoPanel.innerHTML='JSON dimuat.'; } else throw new Error(); } catch(e){ alert('Format harus { islands, depthZones }'); } }
         function exportJson(){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify({ islands: appData.islands, depthZones: appData.depthZones },null,2)],{type:'application/json'})); a.download='gis_data.json'; a.click(); }
-        function loadDefault(){ appData={ islands:[], depthZones:[] }; renderAll(); infoPanel.innerHTML='Data direset. Sekarang zona kedalaman bebas titik.'; }
+        function loadDefault(){ appData={ islands:[], depthZones:[] }; renderAll(); infoPanel.innerHTML='Data direset.'; }
         function clearAllIslands(){ if(confirm('Hapus semua pulau?')){ appData.islands=[]; renderAll(); } }
-        function clearAllDepthZones(){ if(confirm('Hapus SEMUA jalur kedalaman?')){ appData.depthZones=[]; renderAll(); } }
+        function clearAllDepthZones(){ if(confirm('Hapus SEMUA zona kedalaman?')){ appData.depthZones=[]; renderAll(); } }
         function searchIslandsFunc(){ const term=searchIsland.value.toLowerCase(); if(!term){ renderAll(); return; } const filtered=appData.islands.filter(i=>i.name.toLowerCase().includes(term)); if(!filtered.length){ islandListDiv.innerHTML='<div>Tidak ditemukan</div>'; return; } let h=''; filtered.forEach((isl,idx)=>{ const real=appData.islands.findIndex(x=>x.name===isl.name); h+=`<div class="island-item" onclick="window.focusIsland(${real})"><div class="item-name">🏝️ ${isl.name}</div><div class="item-detail">${isl.polygon.length} titik</div></div>`; }); islandListDiv.innerHTML=h; }
         function exportCoordinates(){ if(currentDrawingPoints.length){ navigator.clipboard.writeText(JSON.stringify(currentDrawingPoints.map(p=>[p.lat,p.lng]))); infoPanel.innerHTML='Koordinat titik disalin'; } else alert('Tidak ada titik'); }
         
         // Impor file
-        function importJsonFile(file){ const reader=new FileReader(); reader.onload=e=>{ try{ const d=JSON.parse(e.target.result); if(d.islands!==undefined && d.depthZones!==undefined){ appData.islands=d.islands; appData.depthZones=d.depthZones; renderAll(); infoPanel.innerHTML=`Impor sukses: ${appData.islands.length} pulau, ${appData.depthZones.length} zona (semua titik tersimpan).`; } else throw new Error(); } catch(err){ alert('JSON harus memiliki islands & depthZones'); } }; reader.readAsText(file); }
+        function importJsonFile(file){ const reader=new FileReader(); reader.onload=e=>{ try{ const d=JSON.parse(e.target.result); if(d.islands!==undefined && d.depthZones!==undefined){ appData.islands=d.islands; appData.depthZones=d.depthZones; renderAll(); infoPanel.innerHTML=`Impor sukses: ${appData.islands.length} pulau, ${appData.depthZones.length} zona.`; } else throw new Error(); } catch(err){ alert('JSON harus memiliki islands & depthZones'); } }; reader.readAsText(file); }
         fileImportArea.addEventListener('click',()=>jsonFileInput.click()); jsonFileInput.addEventListener('change',e=>e.target.files[0]&&importJsonFile(e.target.files[0]));
         
         // Set mode line/curve
@@ -571,7 +551,7 @@
         
         // Data contoh kosong, siap pakai
         renderAll();
-        infoPanel.innerHTML = '✅ Siap! Untuk Zona Kedalaman: Tab Kedalaman → "Buat Jalur Kedalaman" → gambar polyline dengan klik sebanyak apapun → isi Nama & Kedalaman 1x. SEMUA titik akan tersimpan.';
+        infoPanel.innerHTML = '✅ Siap! Untuk Zona Kedalaman: Tab Kedalaman → "Buat Zona Kedalaman" → gambar area (poligon) → isi Nama & Kedalaman 1x.';
     </script>
 </body>
 </html>
